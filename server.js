@@ -17,7 +17,7 @@ app.use(cors({
 app.use(express.json());
 
 // MONGODB ATLAS KONFIGURATION
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://pascaleichenberg:UTLgQ4vhWZTARw4q@cluster0.ttpr498.mongodb.net/';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://pascaleichenberg:UTLgQ4vhWZTARw4q@cluster0.ttpr498.mongodb.net/GKI?retryWrites=true&w=majority';
 const DATABASE_NAME = 'GKI';
 
 // Collection Mapping (wie bisher)
