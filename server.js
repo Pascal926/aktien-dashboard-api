@@ -126,7 +126,7 @@ app.get('/api/chart-data', async (req, res) => {
                 // Daten aus Atlas laden (nach Datum sortiert)
                 const stockData = await db.collection(collectionName)
                     .find({})
-                    .sort({ "Date": 1 })
+                    .sort({ "Date;": 1 })
                     .toArray();
                 
                 if (stockData.length === 0) {
@@ -138,7 +138,7 @@ app.get('/api/chart-data', async (req, res) => {
                 const chartPoints = stockData
                     .map(item => {
                         const price = parsePrice(item.Close);
-                        const date = formatDateForChart(item.Date);
+                        const date = formatDateForChart(item['Date;']); // ← Semikolon beachten
                         
                         // Chart.js verwendet x/y Format
                         return (price && date) ? {
