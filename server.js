@@ -1,4 +1,4 @@
-// CLOUD-OPTIMIERTE API FÜR VERCEL + MONGODB ATLAS
+// CLOUD-OPTIMIERTE API FÜR VERCEL + MONGODB ATLAS (Chart.js optimiert)
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const cors = require('cors');
@@ -29,7 +29,7 @@ const COLLECTIONS = {
     'MSCI World': 'MSCI World'
 };
 
-// Chart-Farben
+// Chart-Farben (Chart.js optimiert)
 const STOCK_COLORS = {
     'SAP': '#0053e7',
     'Microsoft': '#00a2ed',
@@ -54,6 +54,22 @@ function parsePrice(priceString) {
     
     const price = parseFloat(clean);
     return isNaN(price) ? null : price;
+}
+
+// Chart.js-optimierte Datum-Formatierung
+function formatDateForChart(dateString) {
+    if (!dateString) return null;
+    
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return null;
+        
+        // Chart.js Zeit-Format: "2020-05-14"
+        return date.toISOString().split('T')[0];
+    } catch (error) {
+        console.error('Datum-Parsing Fehler:', error);
+        return null;
+    }
 }
 
 // MongoDB Atlas Verbindung
@@ -88,7 +104,7 @@ async function connectToAtlas() {
     }
 }
 
-// HAUPT-API: Chart-Daten für CodePen
+// HAUPT-API: Chart-Daten für CodePen (Chart.js optimiert)
 app.get('/api/chart-data', async (req, res) => {
     try {
         console.log('📡 CodePen Chart Request von:', req.get('origin') || 'Unbekannt');
@@ -107,7 +123,7 @@ app.get('/api/chart-data', async (req, res) => {
         
         for (const [stockName, collectionName] of Object.entries(COLLECTIONS)) {
             try {
-                // Daten aus Atlas laden
+                // Daten aus Atlas laden (nach Datum sortiert)
                 const stockData = await db.collection(collectionName)
                     .find({})
                     .sort({ "Date": 1 })
@@ -118,29 +134,39 @@ app.get('/api/chart-data', async (req, res) => {
                     continue;
                 }
                 
-                // Chart-Format konvertieren
-                const priceData = stockData
+                // Chart.js-Format konvertieren
+                const chartPoints = stockData
                     .map(item => {
                         const price = parsePrice(item.Close);
-                        return price ? {
-                            date: item.Date,    // "15.05.2020"
-                            price: price        // 171.39
+                        const date = formatDateForChart(item.Date);
+                        
+                        // Chart.js verwendet x/y Format
+                        return (price && date) ? {
+                            x: date,  // "2020-05-14"
+                            y: price  // 171.39
                         } : null;
                     })
                     .filter(item => item !== null);
                 
-                if (priceData.length === 0) {
-                    console.log(`⚠️ ${stockName}: Keine gültigen Preise`);
+                if (chartPoints.length === 0) {
+                    console.log(`⚠️ ${stockName}: Keine gültigen Chart-Punkte`);
                     continue;
                 }
                 
+                // Chart.js Dataset-Format
                 chartData.push({
                     label: stockName,
-                    color: STOCK_COLORS[stockName],
-                    data: priceData
+                    data: chartPoints,
+                    borderColor: STOCK_COLORS[stockName],
+                    backgroundColor: STOCK_COLORS[stockName] + '20', // 20% opacity
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.1,
+                    pointRadius: 0,
+                    pointHoverRadius: 4
                 });
                 
-                console.log(`✅ ${stockName}: ${priceData.length} Datenpunkte`);
+                console.log(`✅ ${stockName}: ${chartPoints.length} Chart-Punkte`);
                 
             } catch (error) {
                 console.error(`❌ ${stockName} Fehler:`, error.message);
@@ -151,11 +177,72 @@ app.get('/api/chart-data', async (req, res) => {
             success: true,
             timestamp: new Date().toISOString(),
             source: 'MongoDB Atlas',
-            dataPoints: chartData.reduce((sum, stock) => sum + stock.data.length, 0),
-            data: chartData
+            datasets: chartData.length,
+            totalDataPoints: chartData.reduce((sum, dataset) => sum + dataset.data.length, 0),
+            // Chart.js-kompatibles Format
+            chartConfig: {
+                type: 'line',
+                data: {
+                    datasets: chartData
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                parser: 'YYYY-MM-DD',
+                                displayFormats: {
+                                    day: 'MMM DD',
+                                    month: 'MMM YYYY'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Datum'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Kurs ($)'
+                            },
+                            beginAtZero: false
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Aktienentwicklung (2020-2025)'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                title: function(context) {
+                                    return new Date(context[0].parsed.x).toLocaleDateString('de-DE');
+                                },
+                                label: function(context) {
+                                    return `${context.dataset.label}: $${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            }
         };
         
-        console.log(`✅ Chart-API: ${chartData.length} Aktien, ${response.dataPoints} Datenpunkte`);
+        console.log(`✅ Chart-API: ${chartData.length} Datasets, ${response.totalDataPoints} Datenpunkte`);
         res.json(response);
         
     } catch (error) {
@@ -190,7 +277,8 @@ app.get('/api/health', async (req, res) => {
                 collections: collections,
                 cluster: 'cluster0.ttpr498.mongodb.net'
             },
-            environment: process.env.NODE_ENV || 'development'
+            environment: process.env.NODE_ENV || 'development',
+            chartJsOptimized: true
         });
         
     } catch (error) {
@@ -205,15 +293,16 @@ app.get('/api/health', async (req, res) => {
 // Root-Endpoint für Vercel
 app.get('/', (req, res) => {
     res.json({
-        message: '🚀 Aktien-Dashboard API',
-        version: '2.0',
+        message: '🚀 Aktien-Dashboard API (Chart.js optimiert)',
+        version: '2.1',
         status: 'Online',
         endpoints: {
             chartData: '/api/chart-data',
             health: '/api/health'
         },
         database: 'MongoDB Atlas',
-        deployment: 'Vercel'
+        deployment: 'Vercel',
+        chartLibrary: 'Chart.js v4.4.0'
     });
 });
 
@@ -251,7 +340,7 @@ process.on('SIGTERM', async () => {
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, async () => {
         console.log('🚀 ================================');
-        console.log('🚀 CLOUD API FÜR MONGODB ATLAS');
+        console.log('🚀 CHART.JS OPTIMIERTE API');
         console.log('🚀 ================================');
         console.log(`🌐 Server: http://localhost:${PORT}`);
         console.log(`📊 Chart-API: http://localhost:${PORT}/api/chart-data`);
@@ -259,7 +348,7 @@ if (process.env.NODE_ENV !== 'production') {
         console.log('🚀 ================================');
         
         await connectToAtlas();
-        console.log('\n✅ API BEREIT FÜR CODEPEN!');
+        console.log('\n✅ API BEREIT FÜR CHART.JS + CODEPEN!');
     });
 }
 
